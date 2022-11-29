@@ -1,0 +1,32 @@
+[
+    {
+        "packageName": "paket1",
+        "tag": "1 Numara",
+        "price": "34.99"
+    },
+    {
+        "packageName": "paket2",
+        "tag": "1 Numara",
+        "price": "34.99"
+    },
+    {
+        "packageName": "paket3",
+        "tag": "1 Numara",
+        "price": "34.99"
+    },
+    {
+        "packageName": "paket4",
+        "tag": "2 Numara",
+        "price": "34.99"
+    },
+    {
+        "packageName": "paket5",
+        "tag": "2 Numara",
+        "price": "34.99"
+    },
+    {
+        "packageName": "paket6",
+        "tag": "2 Numara",
+        "price": "34.99"
+    }
+]

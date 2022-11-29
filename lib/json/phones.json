@@ -1,0 +1,62 @@
+[
+    {
+        "countryCode": "90",
+        "number": "5322166670",
+        "label": "Turkcell",
+        "status": "processing",
+        "created": "2022-10-16 14:52:45.070840",
+        "notificationEnabled": true,
+        "activities": [
+            {
+                "transactionDate": "17/06/2022",
+                "startingTime": "13:27",
+                "endTime": "13:34"
+            },
+            {
+                "transactionDate": "18/06/2022",
+                "startingTime": "13:38",
+                "endTime": "13:47"
+            }
+        ]
+    },
+    {
+        "countryCode": "90",
+        "number": "5441754400",
+        "label": "Vodafone",
+        "status": "processing",
+        "created": "2022-10-14 14:52:45.070840",
+        "notificationEnabled": true,
+        "activities": [
+            {
+                "transactionDate": "17/06/2022",
+                "startingTime": "17:31",
+                "endTime": "17:34"
+            },
+            {
+                "transactionDate": "18/06/2022",
+                "startingTime": "19:49",
+                "endTime": "20:01"
+            },
+            {
+                "transactionDate": "18/06/2022",
+                "startingTime": "21:15",
+                "endTime": "21:21"
+            },
+            {
+                "transactionDate": "18/06/2022",
+                "startingTime": "21:15",
+                "endTime": "21:21"
+            },
+            {
+                "transactionDate": "18/06/2022",
+                "startingTime": "21:15",
+                "endTime": "21:21"
+            },
+            {
+                "transactionDate": "18/06/2022",
+                "startingTime": "21:15",
+                "endTime": "21:21"
+            }
+        ]
+    }
+]
