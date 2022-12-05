@@ -5,12 +5,13 @@ import 'package:iconify_flutter/iconify_flutter.dart';
 import 'package:iconify_flutter/icons/carbon.dart';
 import 'package:wpfamilylastseen/const/colors.dart';
 import 'package:wpfamilylastseen/const/date.dart';
+import 'package:wpfamilylastseen/modal/numbersmodal.dart';
 import 'package:wpfamilylastseen/modal/phonemodal.dart';
 import 'package:wpfamilylastseen/widgets/analiticspagepopup.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ChartWidget extends StatefulWidget {
-  final Phone phone;
+  final Numbers phone;
   const ChartWidget({Key key, @required this.phone}) : super(key: key);
 
   @override
@@ -351,7 +352,7 @@ class _ChartWidgetState extends State<ChartWidget> {
 }
 
 class AnaliticsOnlineGraph extends StatelessWidget {
-  final Phone phone;
+  final Numbers phone;
   final int selectedOnlineGraphTab;
   final Function(int) onValueChanged;
   const AnaliticsOnlineGraph(

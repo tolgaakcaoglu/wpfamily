@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:country_codes/country_codes.dart';
 import 'package:country_pickers/country.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,16 +20,21 @@ import 'package:iconify_flutter/icons/la.dart';
 import 'package:iconify_flutter/icons/lucide.dart';
 import 'package:iconify_flutter/icons/material_symbols.dart';
 import 'package:language_picker/languages.dart';
+import 'package:location/location.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wpfamilylastseen/const/colors.dart';
 import 'package:wpfamilylastseen/const/localeprovider.dart';
+import 'package:wpfamilylastseen/modal/clientmodal.dart';
+import 'package:wpfamilylastseen/modal/numbersmodal.dart';
 import 'package:wpfamilylastseen/modal/premiummodal.dart';
-import 'package:wpfamilylastseen/privacyandpolicytexts.dart';
+import 'package:wpfamilylastseen/modal/productsmodal.dart';
+import 'package:wpfamilylastseen/modal/settingsmodal.dart';
+import 'package:wpfamilylastseen/utils/utils.dart';
 import 'package:wpfamilylastseen/widgets/analiticspagewidget.dart';
 import 'package:wpfamilylastseen/widgets/homepagepopups.dart';
+
 import 'funct/functions.dart';
 import 'l10n/l10n.dart';
-import 'modal/phonemodal.dart';
 import 'widgets/homepagewidgets.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -71,14 +79,82 @@ class AilApp extends StatelessWidget {
               appBarTheme: const AppBarTheme(
                   backgroundColor: Colorize.black, elevation: 0.0),
             ),
-            home: const HomePage(),
+            home: const Splash(),
           );
         });
   }
 }
 
+class Splash extends StatefulWidget {
+  const Splash({Key key}) : super(key: key);
+
+  @override
+  State<Splash> createState() => _SplashState();
+}
+
+class _SplashState extends State<Splash> {
+  String timezone;
+  @override
+  void initState() {
+    super.initState();
+
+    _getLocation();
+
+    Timer(
+        const Duration(milliseconds: 800),
+        () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => HomePage(
+                      locale: Localizations.localeOf(context).countryCode,
+                      timezone: timezone,
+                    ))));
+  }
+
+  _getLocation() async {
+    Location location = Location();
+    bool serviceEnabled;
+    PermissionStatus permissionLocation;
+    LocationData locationData;
+
+    serviceEnabled = await location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await location.requestService();
+      if (!serviceEnabled) {
+        return;
+      }
+    }
+
+    permissionLocation = await location.hasPermission();
+
+    if (permissionLocation == PermissionStatus.denied) {
+      permissionLocation = await location.requestPermission();
+      if (permissionLocation != PermissionStatus.granted) {
+        return;
+      }
+    }
+
+    locationData = await location.getLocation();
+
+    if (mounted) {
+      var zone = await Utils.getTimezone(locationData);
+
+      setState(() {
+        timezone = zone;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
+}
+
 class HomePage extends StatefulWidget {
-  const HomePage({Key key}) : super(key: key);
+  final String locale, timezone;
+  const HomePage({Key key, @required this.locale, @required this.timezone})
+      : super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -88,20 +164,20 @@ class _HomePageState extends State<HomePage> {
   int phoneAddedLimit = 3;
   bool isPremium = false;
 
-  String imeiNo;
-  String version;
-  String locale;
+  Client client;
+  bool error = false;
 
-  TextEditingController newPhoneNameField =
-      TextEditingController(); // Yeni telefon eklendiğinde "telefon ismi" değerini sağlayan controller
-  TextEditingController newPhoneNumberField =
-      TextEditingController(); // Yeni telefon eklendiğinde "telefon numarası" değerini sağlayan controller
-  List<Phone> _phones; // Tüm kayıtlı telefon bilgilerini bu değişken tutacak
-  List<PremiumPackage>
-      _premiumPackages; // Tüm premium paket bilgilerini bu değişken tutacak
-  DateTime
-      activitesDateFilter; // Aktivitelerin filtrelendiği tarih bilgisini tutan eleman
+  TextEditingController newPhoneNameField = TextEditingController();
+  TextEditingController newPhoneNumberField = TextEditingController();
+  List<Numbers> _phones;
+  List<PremiumPackage> _premiumPackages;
+  List<Products> _products;
+  DateTime activitesDateFilter;
   String phoneCode = '+90';
+
+  static final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
+  String device = '';
+  String devicemodel = '';
 
   @override
   void initState() {
@@ -112,21 +188,75 @@ class _HomePageState extends State<HomePage> {
   }
 
   _init() {
-    _getPhones(); // Kayıtlı telefonları json'dan alan fonksiyon
-    _getPremiumPackages(); // Kayıtlı premium paketlerini json'dan alan fonksiyon
+    _getDevice();
+    if (mounted) {
+      _registerMethod();
+
+      setState(() {});
+
+      if (mounted) {
+        _getPhones();
+        _getPremiumPackages();
+        _getProducts();
+        setState(() {});
+      }
+    }
+  }
+
+  _getDevice() async {
+    try {
+      if (Platform.isAndroid) {
+        var info = await deviceInfoPlugin.androidInfo;
+        device = info.id.replaceAll('.', '-');
+        devicemodel = info.model;
+      } else if (Platform.isIOS) {
+        var info = await deviceInfoPlugin.iosInfo;
+        device = info.utsname.nodename;
+        devicemodel = info.utsname.machine;
+      }
+
+      setState(() {});
+    } on PlatformException {
+      debugPrint('error');
+      error = true;
+    }
 
     setState(() {});
   }
 
-  
+  _registerMethod() async {
+    var json = await Funcs.register(
+        device, widget.timezone, widget.locale, devicemodel);
+    if (mounted) {
+      if (json == "error") {
+        setState(() {
+          error = true;
+        });
+      } else {
+        Client c = Client.build(jsonDecode(json));
+
+        setState(() {
+          client = c;
+        });
+      }
+    }
+  }
 
   void _getPhones() async {
-    List<Phone> copy = await Funcs.getPhones();
-    if (mounted) {
+    var body = await Funcs.numbers(device);
+    if (body == "error") {
       setState(() {
-        _phones = copy;
+        error = true;
+        return;
       });
-      if (copy.isNotEmpty) {
+    }
+
+    if (mounted) {
+      List list = jsonDecode(body);
+      setState(() {
+        _phones = list.map((e) => Numbers.build(jsonDecode(e))).toList();
+      });
+      if (_phones.isNotEmpty) {
         Timer(
           const Duration(seconds: 5),
           () => Navigator.push(
@@ -143,7 +273,7 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       }
-      if (copy.isEmpty) {
+      if (_phones.isEmpty) {
         newPhoneAddPopUp(
           context,
           newPhoneNameField,
@@ -160,15 +290,30 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _getPremiumPackages() async {
-    List<PremiumPackage> copy = await Funcs.getPremiumPackages();
+    List<PremiumPackage> list = await Funcs.getPremiumPackages();
+
     if (mounted) {
+      _premiumPackages = list;
+    }
+  }
+
+  void _getProducts() async {
+    var body = await Funcs.products(device);
+    if (body == "error") {
       setState(() {
-        _premiumPackages = copy;
+        error = true;
+      });
+      return;
+    }
+    if (mounted) {
+      List list = jsonDecode(body);
+      setState(() {
+        _products = list.map((e) => Products.build(e)).toList();
       });
     }
   }
 
-  newPhoneAddButtonFunction(context) => () {
+  newPhoneAddButtonFunction(context) => () async {
         // Numara Ekleme Popup'una ait "Takibe Başla (Kaydet)" butonuna ait fonksiyon
 
         // Input alanlarının dolu olup olmadığı kontrol ediliyor
@@ -183,24 +328,34 @@ class _HomePageState extends State<HomePage> {
           // kayıtlı telefon sayısı kontrol edilip, cihaz ekleme limitimiz dolmuş mu diye bakıyor
           if (_phones.length < phoneAddedLimit) {
             // cihaz kaydetme limitimiz dolmadıysa burası çalışıyor ve yeni telefon bilgilerini cihazlarımıza kaydetmesi bekleniyor
-            _phones.add(Phone.build(
-              {
-                "countryCode": phoneCode,
-                "number": newPhoneNumberField.text.replaceAll(' ', '').trim(),
-                "label": newPhoneNameField.text.trim(),
-                "status": "waiting",
-                "created": "2022-10-16 14:52:45.070840",
-                "activities": []
-              },
-            ));
-            newPhoneNameField.clear();
-            newPhoneNumberField.clear();
+            var body = await Funcs.addNumber(
+                newPhoneNameField.text.trim(),
+                newPhoneNumberField.text.replaceAll(' ', '').trim(),
+                phoneCode,
+                'token',
+                'detail',
+                device);
+            if (body == "error") {
+              failedPopUp(context);
+            } else {
+              _init();
+              Navigator.pop(context);
+              newPhoneNameField.clear();
+              newPhoneNumberField.clear();
+              successPopUp(context);
+            }
+            // _phones.add(Phone.build(
+            //     {
+            //       "countryCode": phoneCode,
+            //       "number": newPhoneNumberField.text.replaceAll(' ', '').trim(),
+            //       "label": newPhoneNameField.text.trim(),
+            //       "status": "waiting",
+            //       "created": "2022-10-16 14:52:45.070840",
+            //       "activities": []
+            //     },
+            //   ));
+
             setState(() {});
-            Navigator.pop(context);
-            // Yeni telefon ekleme ekranı kapanıyor ve alttaki başarılı komutu çalışıyor
-            // ? Başarısız olma durumunda
-            // failedPopUp(context); // fonksiyonunu çalıştırabilirsiniz
-            successPopUp(context);
           } else {
             // Telefon ekleme limitimizin dolu olduğu durumda bu kısım çalışıyor
             newPhoneNameField.clear();
@@ -245,27 +400,25 @@ class _HomePageState extends State<HomePage> {
                     MaterialPageRoute(
                         builder: (context) =>
                             PricesOptionsPage(packages: _premiumPackages)))),
-
-          // TODO ! SAYFA DATALARINI YENİLEYEN FONKSİYON İHTİYAÇ YOKSA KALDIR
           HomePageIconButton(icon: Ion.refresh_circle, pressed: () => _init()),
-
           HomePageIconButton(
               icon: Eva.settings_fill,
               pressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        SettingsPage(packages: _premiumPackages),
+                    builder: (context) => SettingsPage(
+                        packages: _premiumPackages, device: device),
                   ))),
           const SizedBox(width: 16.0),
         ],
       ),
-      body: _phones == null
+      body: client == null
           ? const Center(child: CircularProgressIndicator())
-          : _phones.isNotEmpty
+          : !error
               ? HomePageBody(
                   phones: _phones,
                   currentDate: activitesDateFilter,
+                  device: device,
                   // ! ACTİVİTELERİN TARİH FİLTERİSİ DEĞİŞTİĞİNDE GELEN TARİH VERİSİ
                   tapDate: (DateTime date) {
                     setState(() {
@@ -273,7 +426,7 @@ class _HomePageState extends State<HomePage> {
                     });
                   },
                 )
-              : const SizedBox(),
+              : const Center(child: Text('Connection error')),
     );
   }
 }
@@ -522,7 +675,7 @@ class _PricesOptionsPageState extends State<PricesOptionsPage> {
 }
 
 class AnaliticsPage extends StatefulWidget {
-  final Phone phone;
+  final Numbers phone;
   const AnaliticsPage({Key key, @required this.phone}) : super(key: key);
 
   @override
@@ -576,17 +729,21 @@ class _AnaliticsPageState extends State<AnaliticsPage> {
 }
 
 class SettingsPage extends StatefulWidget {
+  final String device;
   final List<PremiumPackage> packages;
-  const SettingsPage({Key key, @required this.packages}) : super(key: key);
+  const SettingsPage({Key key, @required this.packages, @required this.device})
+      : super(key: key);
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String supportEmail = 'tolga@aildev.com'; //! TODO DESTEK EMAİLİNİ GİRİN
-  String googlePlayAddress =
-      'https://bionluk.com/aildev'; //! TODO GOOGLE PLAY ADRESİNİ GİRİN
+  String supportEmail = 'dest@mail.co'; //! TODO DESTEK EMAİLİNİ GİRİN
+  String googlePlayAddress = 'https://'; //! TODO GOOGLE PLAY ADRESİNİ GİRİN
+
+  Settings settings;
+  bool error = false;
 
   Widget buildCupertinoItem(Language language) =>
       Center(child: Text(language.name));
@@ -596,6 +753,28 @@ class _SettingsPageState extends State<SettingsPage> {
         .map((MapEntry<String, String> e) =>
             '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
         .join('&');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _getSettings();
+  }
+
+  _getSettings() async {
+    var body = await Funcs.settings(widget.device);
+    if (body == "error") {
+      setState(() {
+        error = true;
+      });
+    } else {
+      Settings s = Settings.build(jsonDecode(body));
+
+      setState(() {
+        settings = s;
+      });
+    }
   }
 
   @override
@@ -626,12 +805,14 @@ class _SettingsPageState extends State<SettingsPage> {
       {
         "icon": Lucide.file_terminal,
         "title": lang.termsofuse,
-        "onTap": () => navigate(const PolicyAndPrivacyPage(page: 'policy')),
+        "onTap": () => navigate(
+            PolicyAndPrivacyPage(page: 'policy', content: settings.termsOfUse)),
       },
       {
         "icon": MaterialSymbols.privacy_tip_outline_rounded,
         "title": lang.privacypolicy,
-        "onTap": () => navigate(const PolicyAndPrivacyPage(page: 'privacy')),
+        "onTap": () => navigate(PolicyAndPrivacyPage(
+            page: 'privacy', content: settings.privacyPolicy)),
       },
       {
         "icon": La.google_play,
@@ -661,53 +842,59 @@ class _SettingsPageState extends State<SettingsPage> {
         centerTitle: true,
         title: Text(lang.generalSettings),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              ListView.builder(
-                primary: false,
-                shrinkWrap: true,
-                itemCount: list.length,
-                itemBuilder: (BuildContext context, int index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: ListTile(
-                      tileColor: Colorize.layer,
-                      horizontalTitleGap: 8.0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0)),
-                      leading:
-                          Iconify(list[index]['icon'], color: Colorize.icon),
-                      title: Text(list[index]['title']),
-                      onTap: list[index]['onTap'],
+      body: settings == null
+          ? const Center(child: CircularProgressIndicator())
+          : error
+              ? const Center(child: Text('Connection error'))
+              : SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        ListView.builder(
+                          primary: false,
+                          shrinkWrap: true,
+                          itemCount: list.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 4.0),
+                              child: ListTile(
+                                tileColor: Colorize.layer,
+                                horizontalTitleGap: 8.0,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8.0)),
+                                leading: Iconify(list[index]['icon'],
+                                    color: Colorize.icon),
+                                title: Text(list[index]['title']),
+                                onTap: list[index]['onTap'],
+                              ),
+                            );
+                          },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('E-posta: ',
+                                  style: TextStyle(color: Colorize.text)),
+                              Text(supportEmail,
+                                  style:
+                                      const TextStyle(color: Colorize.primary)),
+                            ],
+                          ),
+                        ),
+                        const Text('ID: null',
+                            style: TextStyle(color: Colorize.icon)),
+                        const SizedBox(height: 24.0),
+                        Opacity(
+                            opacity: 0.5,
+                            child: Text(AppLocalizations.of(context).language)),
+                      ],
                     ),
-                  );
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('E-posta: ',
-                        style: TextStyle(color: Colorize.text)),
-                    Text(supportEmail,
-                        style: const TextStyle(color: Colorize.primary)),
-                  ],
+                  ),
                 ),
-              ),
-              const Text('ID: F3AF-8NQI-OH3DQ-PIINF',
-                  style: TextStyle(color: Colorize.icon)),
-              const SizedBox(height: 24.0),
-              Opacity(
-                  opacity: 0.5,
-                  child: Text(AppLocalizations.of(context).language)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -746,7 +933,12 @@ class _ChangeLangaugePageState extends State<ChangeLangaugePage> {
 
 class PolicyAndPrivacyPage extends StatelessWidget {
   final String page;
-  const PolicyAndPrivacyPage({Key key, @required this.page}) : super(key: key);
+  final String content;
+  const PolicyAndPrivacyPage({
+    Key key,
+    @required this.page,
+    @required this.content,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -760,7 +952,7 @@ class PolicyAndPrivacyPage extends StatelessWidget {
         physics: const ScrollPhysics(parent: BouncingScrollPhysics()),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(page == "privacy" ? privacyText : policyText),
+          child: Text(content),
         ),
       ),
     );

@@ -8,7 +8,8 @@ import 'package:iconify_flutter/icons/carbon.dart';
 import 'package:iconify_flutter/icons/eva.dart';
 import 'package:iconify_flutter/icons/icon_park_twotone.dart';
 import 'package:wpfamilylastseen/const/colors.dart';
-import 'package:wpfamilylastseen/modal/phonemodal.dart';
+import 'package:wpfamilylastseen/funct/functions.dart';
+import 'package:wpfamilylastseen/modal/numbersmodal.dart';
 import 'package:wpfamilylastseen/widgets/homepagewidgets.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -101,7 +102,8 @@ failedPopUp(BuildContext context) => popUpContainer(
       ),
     );
 
-editPhonePopUp(BuildContext context, Phone phone, Function(bool) onChanged) =>
+editPhonePopUp(BuildContext context, Numbers phone, Function(bool) onChanged,
+        bool notification, TextEditingController nameController, device) =>
     popUpContainer(
         context,
         Column(
@@ -112,10 +114,9 @@ editPhonePopUp(BuildContext context, Phone phone, Function(bool) onChanged) =>
             TextFieldy(
               hint: AppLocalizations.of(context).onlineNotification,
               icon: const Iconify(Eva.bell_fill, color: Colorize.icon),
-              controller: null,
+              controller: nameController,
               type: null,
-              suffix: Switch(
-                  value: phone.notificationEnabled, onChanged: onChanged),
+              suffix: Switch(value: notification, onChanged: onChanged),
               enabled: false,
             ),
             const SizedBox(height: 8.0),
@@ -135,7 +136,9 @@ editPhonePopUp(BuildContext context, Phone phone, Function(bool) onChanged) =>
                 borderRadius: BorderRadius.circular(8.0),
                 color: Colorize.primary,
                 onPressed: () {
-                  // ! TODO YENİ BİLGİLERİ KAYDET
+                  Funcs.editNumber(
+                      nameController.text.trim(), notification ? 1 : 0, device);
+
                   Navigator.pop(context);
                 },
                 child: Text(
@@ -151,9 +154,11 @@ editPhonePopUp(BuildContext context, Phone phone, Function(bool) onChanged) =>
                 borderRadius: BorderRadius.circular(8.0),
                 color: Colorize.layer,
                 onPressed: () {
-                  // ! TODO NUMARAYI KALDIR
+                  Funcs.removeNumber(phone.id, device).then((value) => value == "error"
+                      ? failedPopUp(context)
+                      : successPopUp(context));
+
                   Navigator.of(context).pop();
-                  successPopUp(context);
                 },
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

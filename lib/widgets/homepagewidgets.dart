@@ -11,7 +11,8 @@ import 'package:iconify_flutter/icons/wpf.dart';
 import 'package:wpfamilylastseen/const/colors.dart';
 import 'package:wpfamilylastseen/const/date.dart';
 import 'package:wpfamilylastseen/main.dart';
-import 'package:wpfamilylastseen/modal/phonemodal.dart';
+import 'package:wpfamilylastseen/modal/eventsmodal.dart';
+import 'package:wpfamilylastseen/modal/numbersmodal.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'homepagepopups.dart';
 
@@ -149,9 +150,12 @@ class HomePageSwichProButton extends StatelessWidget {
 class HomePageIconButton extends StatelessWidget {
   final String icon;
   final Function pressed;
-  const HomePageIconButton(
-      {Key key, @required this.icon, @required this.pressed})
-      : super(key: key);
+
+  const HomePageIconButton({
+    Key key,
+    @required this.icon,
+    @required this.pressed,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -169,9 +173,15 @@ class HomePageIconButton extends StatelessWidget {
 
 class HomePageBody extends StatelessWidget {
   final Function(DateTime) tapDate;
-  final List<Phone> phones;
+  final List<Numbers> phones;
   final DateTime currentDate;
-  const HomePageBody({Key key, this.phones, this.tapDate, this.currentDate})
+  final String device;
+  const HomePageBody(
+      {Key key,
+      this.phones,
+      this.tapDate,
+      this.currentDate,
+      @required this.device})
       : super(key: key);
 
   @override
@@ -179,7 +189,7 @@ class HomePageBody extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
-          HomePagePhoneList(phones: phones),
+          HomePagePhoneList(phones: phones, device: device),
           HomePageActivitiesWidget(
               phones: phones, tapDate: tapDate, currentDate: currentDate),
         ],
@@ -189,8 +199,10 @@ class HomePageBody extends StatelessWidget {
 }
 
 class HomePagePhoneList extends StatelessWidget {
-  final List<Phone> phones;
-  const HomePagePhoneList({Key key, this.phones}) : super(key: key);
+  final List<Numbers> phones;
+  final String device;
+  const HomePagePhoneList({Key key, this.phones, @required this.device})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -200,21 +212,25 @@ class HomePagePhoneList extends StatelessWidget {
       shrinkWrap: true,
       padding: const EdgeInsets.all(16.0),
       itemBuilder: (context, index) =>
-          HomePagePhoneCardTile(phone: phones[index]),
+          HomePagePhoneCardTile(phone: phones[index], device: device),
     );
   }
 }
 
 class HomePagePhoneCardTile extends StatefulWidget {
-  final Phone phone;
-  const HomePagePhoneCardTile({Key key, this.phone}) : super(key: key);
+  final Numbers phone;
+  final String device;
+  const HomePagePhoneCardTile({Key key, this.phone, @required this.device})
+      : super(key: key);
 
   @override
   State<HomePagePhoneCardTile> createState() => _HomePagePhoneCardTileState();
 }
 
 class _HomePagePhoneCardTileState extends State<HomePagePhoneCardTile> {
-  Phone phone;
+  Numbers phone;
+  TextEditingController nameController = TextEditingController();
+  bool notification = false;
 
   @override
   void initState() {
@@ -242,12 +258,10 @@ class _HomePagePhoneCardTileState extends State<HomePagePhoneCardTile> {
             padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
             margin: const EdgeInsets.only(left: 40.0),
             decoration: BoxDecoration(
-              color: phone.status == "processing"
-                  ? Colorize.layer
-                  : Colorize.amber,
+              color: phone.status == 0 ? Colorize.layer : Colorize.amber,
               borderRadius: BorderRadius.circular(4.0),
             ),
-            child: phone.status == "processing"
+            child: phone.status == 0
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -304,7 +318,7 @@ class _HomePagePhoneCardTileState extends State<HomePagePhoneCardTile> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        phone.label,
+                        phone.name,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       Text(
@@ -324,21 +338,10 @@ class _HomePagePhoneCardTileState extends State<HomePagePhoneCardTile> {
                     child: IconButton(
                       padding: EdgeInsets.zero,
                       onPressed: () => editPhonePopUp(context, phone, (status) {
-                        var nphone = Phone(
-                            activities: phone.activities,
-                            created: phone.created,
-                            id: phone.id,
-                            label: phone.label,
-                            notificationEnabled: status, //
-                            number: phone.number,
-                            status: phone.status);
-
                         setState(() {
-                          //! TODO çevirim içi durumunu tersine çevir
-                          // phone.notificationEnabled = status;
-                          phone = nphone;
+                          notification = status;
                         });
-                      }),
+                      }, notification, nameController, widget.device),
                       icon: const Iconify(
                         Fa6Solid.pen_to_square,
                         color: Colorize.icon,
@@ -374,7 +377,7 @@ class _HomePagePhoneCardTileState extends State<HomePagePhoneCardTile> {
 
 class HomePageActivitiesWidget extends StatefulWidget {
   final Function(DateTime) tapDate;
-  final List<Phone> phones;
+  final List<Numbers> phones;
   final DateTime currentDate;
   const HomePageActivitiesWidget(
       {Key key, this.phones, this.tapDate, this.currentDate})
@@ -458,7 +461,7 @@ class HomeActivitiesHeader extends StatelessWidget {
 }
 
 class HomeActivitiesTabBar extends StatelessWidget {
-  final List<Phone> phones;
+  final List<Numbers> phones;
   final Function changed;
   final int selectedTab;
   const HomeActivitiesTabBar(
@@ -484,7 +487,7 @@ class HomeActivitiesTabBar extends StatelessWidget {
           children: phones
               .asMap()
               .entries
-              .map((e) => Text(e.value.label,
+              .map((e) => Text(e.value.name,
                   style: TextStyle(
                       color: selectedTab == e.key
                           ? Colorize.black
@@ -496,7 +499,7 @@ class HomeActivitiesTabBar extends StatelessWidget {
 }
 
 class HomeActivitiesListView extends StatelessWidget {
-  final List<Phone> phones;
+  final List<Numbers> phones;
   final int tabIndex;
   const HomeActivitiesListView({Key key, this.tabIndex, this.phones})
       : super(key: key);
@@ -504,7 +507,7 @@ class HomeActivitiesListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppLocalizations lang = AppLocalizations.of(context);
-    return phones[tabIndex].activities.isEmpty
+    return phones[tabIndex].events.isEmpty
         ? Container(
             width: MediaQuery.of(context).size.width,
             padding:
@@ -543,7 +546,7 @@ class HomeActivitiesListView extends StatelessWidget {
             primary: false,
             shrinkWrap: true,
             children: phones[tabIndex]
-                .activities
+                .events
                 .map((a) => ActivityCard(
                       phone: phones[tabIndex],
                       activity: a,
@@ -553,8 +556,8 @@ class HomeActivitiesListView extends StatelessWidget {
 }
 
 class ActivityCard extends StatelessWidget {
-  final Phone phone;
-  final Activite activity;
+  final Numbers phone;
+  final Events activity;
   const ActivityCard({Key key, this.phone, this.activity}) : super(key: key);
 
   @override
@@ -572,9 +575,9 @@ class ActivityCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(phone.label, overflow: TextOverflow.ellipsis),
+              Text(phone.name, overflow: TextOverflow.ellipsis),
               Text(
-                activity.startingTime,
+                activity.onlineHour,
                 style: const TextStyle(fontSize: 12.0, color: Colorize.icon),
               )
             ],
@@ -583,9 +586,9 @@ class ActivityCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text(
-                '00:07',
-                style: TextStyle(
+              Text(
+                activity.duraction,
+                style: const TextStyle(
                   fontSize: 18.0,
                   fontWeight: FontWeight.w800,
                 ),
@@ -604,9 +607,9 @@ class ActivityCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text('2 Agu', overflow: TextOverflow.ellipsis),
+              Text(activity.offlineDate, overflow: TextOverflow.ellipsis),
               Text(
-                activity.endTime,
+                activity.offlineHour,
                 style: const TextStyle(
                   fontSize: 12.0,
                   color: Colorize.icon,

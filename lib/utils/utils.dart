@@ -1,3 +1,10 @@
-import 'package:device_information/device_information.dart';
+import 'package:geocoding/geocoding.dart';
 
-class Utils {}
+class Utils {
+  static Future<String> getTimezone(locationData) async {
+    var placemark = await placemarkFromCoordinates(
+        locationData.latitude, locationData.longitude);
+
+    return '${placemark.first.country}/${placemark.first.administrativeArea}';
+  }
+}
